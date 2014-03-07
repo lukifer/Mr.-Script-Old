@@ -452,7 +452,7 @@ function GM_get(dest, callback, errCallback) {
         headers: {"Referer": "http://" + location.host + "/game.php"},
     	onerror:function(error) {
 			if (typeof(errCallback)=='function' ) {
-				callback(details.responseText);
+				errCallback(error);
 			} else {
 				GM_log("GM_get Error: " + error);
 			}
@@ -1303,6 +1303,114 @@ function AddToTopOfMain(newElement,refDocument) {
 		}
 	}
 }
+
+// INLINEITEMDESCRIPTIONS: Because window.open makes baby Jesus cry
+function InlineItemDescriptions() {
+
+	//if(!GetPref("InlineItemDescriptions")) return;
+
+	document.addEventListener("click", function(e) {
+
+		if(e.target.tagName === "IMG") {
+
+			if(e.shiftKey || e.altKey || e.metaKey || e.which === 2) return true;
+
+			var $img = $(e.target);
+			window.$img = $img;
+			var onclick = $img.attr("onclick");
+			if(onclick && onclick.indexOf("descitem") === 0) {
+
+				var item = onclick.match(/descitem\(([0-9]*)/)[1];
+				if(!item) return true;
+
+				var $body = $("body");
+				var pos = $img.position();
+				var x = pos.left - - 15 - 150;
+				var y = pos.top  - - 15;
+
+				if(!window.$overlay) {
+					window.$overlay = $('<div id="_descitem_overlay"></div>')
+						.css({
+							"background": "transparent",
+							"position": "fixed",
+							"top": 0,
+							"bottom": 0,
+							"left": 0,
+							"right": 0,
+							"zIndex": "100"
+						});
+
+					window.$overlay.on("click", function(e) {
+						var $desc = $("._descitem");
+						$desc.css({"transform": "scale(0.1)"});
+						setTimeout(function(){ $desc.remove(); }, 120);
+					});
+
+					$(document).on("keyup", function(e) {
+						if(e.keyCode == 27) window.$overlay.triggerHandler("click");
+					});
+
+					$body
+						.append('<style type="text/css">img.hand {'
+							+'position:relative; top:0; left:0; z-index: 200; }</style>')
+						.append(window.$overlay[0]);
+				}
+
+				window.$overlay.triggerHandler("click");
+
+				var $desc = $('<div class="_descitem"></div>')
+					.css({
+						"background": "white",
+						"border": "1px solid black",
+						"paddingTop": 10,
+						"boxShadow": "0 0 3px gray",
+						"display": "none",
+						"position": "absolute",
+						"overflow": "auto",
+						"maxHeight": 450,
+						"width": 300,
+						"zIndex": "300",
+						"transform": "scale(0.1)",
+						"transition": "transform linear 120ms"
+					});
+				$body.append($desc[0]);
+
+				var url = '/desc_item.php?whichitem='+item;
+				GM_get(server+url, function(html) {
+					var start = html.indexOf('<center>');
+					var end	= html.lastIndexOf('</blockquote>');
+
+					$desc
+						.html(html.slice(start, end - - 13))
+						.css({"top": y, "left": parseInt(x), "display": "block" });
+					$desc
+						.children("blockquote")
+						.css("margin", "15px");
+
+					$desc.css({
+						"top": y - ($desc.height() / 2),
+						"opacity": 1,
+						"transform": "scale(1)"
+					})
+
+					var $b = $desc.find("b:first")
+					$b.wrap('<a href="http://kol.coldfront.net/thekolwiki/index.php/Special:'+
+						'Search?search='+ $b.text().replace(/\s/g, '+') +'&go=Go" target="_blank"></a>');
+
+				}, function(err){  alert(err); });
+
+				e.preventDefault();
+				e.stopPropagation();
+
+				return false;
+			}
+		}
+
+		return true;
+
+	}, true);
+}
+
 
 // MAIN.HTML: Resize top pane a bit and store password hash.
 // was main_c
@@ -2408,6 +2516,8 @@ function at_inventory() {
 			}
 		}
 	}
+
+	InlineItemDescriptions();
 
 	// Equipment page only
 	if (gearpage == 1) {
