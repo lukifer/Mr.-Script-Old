@@ -1313,7 +1313,7 @@ function InlineItemDescriptions() {
 
 		if(e.target.tagName === "IMG") {
 
-			if(e.shiftKey || e.altKey || e.metaKey || e.which === 2) return true;
+			if(e.shiftKey || e.altKey || e.metaKey || e.button === 2) return true;
 
 			var $img = $(e.target);
 			window.$img = $img;
@@ -1351,8 +1351,9 @@ function InlineItemDescriptions() {
 					});
 
 					$body
-						.append('<style type="text/css">img.hand {'
-							+'position:relative; top:0; left:0; z-index: 200; }</style>')
+						.append('<style type="text/css">'
+							+'img.hand {position:relative; top:0; left:0; z-index: 200;}'
+							+'#pop_ircm {z-index: 300;}</style>')
 						.append(window.$overlay[0]);
 				}
 
