@@ -37,11 +37,15 @@
 
 
 var place = location.pathname.replace(/\/|\.(php|html)$/gi, "").toLowerCase();
+if(place === "place") {
+	var match = location.search.match(/whichplace=([0-9a-zA-Z_\-]*)/);
+	if(match.length > 1) place = match[1];
+}
 //console.time("Mr. Script @ " + place);
-//GM_log("at:" + place);
+//console.log("at:" + place);
 
 // n.b. version number should always be a 3-digit number.  If you move to 1.9, call it 1.9.0.  Don't go to 1.8.10 or some such.
-var VERSION = 176;
+var VERSION = 180;
 var MAXLIMIT = 999;
 var ENABLE_QS_REFRESH = 1;
 var DISABLE_ITEM_DB = 0;
@@ -56,8 +60,8 @@ var server = location.host, serverNo = (server.match(/(.)\./) || {1:"L"})[1]; 	/
 
 var pwd = GM_getValue('hash.' + server.split('.')[0]);
 
-var autoclear = GetPref('autoclear');
-var spoilers = GetPref('zonespoil') == 1;
+var prefAutoclear = GetPref('autoclear');
+var prefSpoilers = GetPref('zonespoil') == 1;
 
 //really cool hack to capture DomNodeInserts without having to use the deprecated DOMNodeInserted event,
 //which is apparently a huge performance drain:
@@ -85,7 +89,7 @@ var handler;
 if ((handler = global["at_" + place])) {
 	handler();
 }
-if ((handler = spoilers && global["spoil_" + place])) {
+if ((handler = prefSpoilers && global["spoil_" + place])) {
 	handler();
 }
 
@@ -95,18 +99,6 @@ handler = null;
 // no imperative top-level code below here; the rest is function definitions:
 
 //at_place: general function for handling locations in the newer "place.php?whichplace=" format.
-function at_place() {
-	var whichplace = document.location.search;
-    whichplace = whichplace.split('&',1)[0];	//?whichplace=foo&action=bar -> ?whichplace=foo
-	whichplace = whichplace.split('=',2)[1];	//?whichplace=foo -> foo
-    place = whichplace;                         //set global variable for other functions.
-	var handler = global["at_" + place];
-//    GM_log("at_place: at " + place);
-	if (handler && typeof handler == "function") {
-		handler();
-	}
-}
-
 jQuery.prototype.toString = function() {
   return "[jQuery:" + this.length + "]";
 };
@@ -117,9 +109,9 @@ String.prototype.trim = function () {
 
 // ANYWHERE: stuff that we want to do on every possible occasion.
 function anywhere() {
-	if (autoclear) {
+	if (prefAutoclear) {
 		$('input[value=1]').each(function(i) {
-			AddAutoClear(this, autoclear);
+			AddAutoClear(this, prefAutoclear);
 		});
 	}
 }
@@ -493,9 +485,9 @@ function AppendBuyBox(itemNumber, whichStore, buttonText, noQuantityBox) {
 	var eventString = ""; var htmlString = ""; var quantityString;
 	if (noQuantityBox == 1) quantityString = "hidden";
 	else quantityString = "text";
-	if (autoclear == 2) eventString = ' onFocus="this.select();"' +
+	if (prefAutoclear == 2) eventString = ' onFocus="this.select();"' +
 		'onClick="this.select();" OnDblClick="this.select();"';
-	else if (autoclear == 1) eventString =
+	else if (prefAutoclear == 1) eventString =
 	' onFocus="javascript:if(this.value==1) this.value=\'\';"' +
 	' onClick="javascript:if(this.value==1) this.value=\'\';"' +
 	' onBlur="javascript:if(this.value==\'\') this.value=1;" ';
@@ -649,6 +641,7 @@ function AddTopLink(putWhere, target, href, html, space) {
 	$(a).attr('href',href).html(html);
 	$(putWhere).append(a);
 	if (space) $(putWhere).append(document.createTextNode(" "));
+	return a;
 }
 
 function mainpane_goto(go_here) {
@@ -1154,6 +1147,22 @@ function GoGoGadgetPlunger() {
 	}
 }
 
+// CANHAZPLUNGER: Query the server to see if the Plunger is available
+function CanHazPlunger() {
+	GM_get(server + '/' + to_place("knoll_friendly&action=dk_plunger"),function(response) {
+		if (response != "")	{
+            if (response.indexOf("No, no, no.") == -1) {  //zombie plunger not available message
+				SetCharData("plungeraccess","Y");
+            } else {
+                SetCharData("plungeraccess","N");
+            }
+		} else {
+			SetCharData("plungeraccess","N");
+		}
+	}, function(error) { });
+}
+
+
 // DEFAULTS: Pay no attention to the function behind the curtain.
 function Defaults(revert) {
 	var basePrefs = [["splitinv",1],
@@ -1177,7 +1186,8 @@ function Defaults(revert) {
 		  	 ['lairspoil', 1],
 		 	 ['moonslink', 1],
 			 ['malllink', 1],
-			 ['ascension_list','cooked key pies, exploded chef, exploded bartender, discarded karma, bought a skill']
+			 ['ascension_list','cooked key pies, exploded chef, exploded bartender, discarded karma, bought a skill'],
+			 ['inlineitemdesc', 1]
 			];
 	var menu1 = ['market;town_market.php','hermit;hermit.php',
 		'untinker;place.php?whichplace=forestvillage&action=fv_untinker',
@@ -1241,6 +1251,8 @@ function MakeOption(text, num, pref, opt1, opt2) {
 	td.setAttribute('align','right');
 	tr.appendChild(td);
 
+	var selectid = "_mrscript_opt_"+pref.replace(" ", "_");
+
 	td = document.createElement('td');
 	if (num < 0) {
 		select = document.createElement('input');
@@ -1257,6 +1269,7 @@ function MakeOption(text, num, pref, opt1, opt2) {
 		select = document.createElement('select');
 		for (var i=0; i<num; i++) {
 			var option = document.createElement('option');
+			option.setAttribute("id", selectid);
 			if (i == prefVal) option.setAttribute('selected',1);
 			option.value = i; select.appendChild(option);
 			if (i == 0 && opt1 != 0) option.innerHTML = opt1;
@@ -1307,7 +1320,9 @@ function AddToTopOfMain(newElement,refDocument) {
 // INLINEITEMDESCRIPTIONS: Because window.open makes baby Jesus cry
 function InlineItemDescriptions() {
 
-	//if(!GetPref("InlineItemDescriptions")) return;
+	if(GetPref("inlineitemdesc") == 0) return;
+
+	$("img[width=30][onclick*='descitem(']").addClass("hand");
 
 	document.addEventListener("click", function(e) {
 
@@ -1318,7 +1333,7 @@ function InlineItemDescriptions() {
 			var $img = $(e.target);
 			window.$img = $img;
 			var onclick = $img.attr("onclick");
-			if(onclick && onclick.indexOf("descitem") === 0) {
+			if(onclick && onclick.indexOf("descitem(") !== -1) {
 
 				var item = onclick.match(/descitem\(([0-9]*)/)[1];
 				if(!item) return true;
@@ -1341,6 +1356,7 @@ function InlineItemDescriptions() {
 						});
 
 					window.$overlay.on("click", function(e) {
+						window.$overlay.hide();
 						var $desc = $("._descitem");
 						$desc.css({"transform": "scale(0.1)"});
 						setTimeout(function(){ $desc.remove(); }, 120);
@@ -1398,6 +1414,8 @@ function InlineItemDescriptions() {
 					$b.wrap('<a href="http://kol.coldfront.net/thekolwiki/index.php/Special:'+
 						'Search?search='+ $b.text().replace(/\s/g, '+') +'&go=Go" target="_blank"></a>');
 
+					window.$overlay.show();
+
 				}, function(err){  alert(err); });
 
 				e.preventDefault();
@@ -1419,20 +1437,6 @@ function at_main() {
 	FindHash();
 	setTimeout("if (top.frames[0].location == 'about:blank')" +
              " top.frames[0].location = 'topmenu.php'", 1500);	// fix for top menu not always loading properly
-	if (GetCharData("plungeraccess") == undefined || GetCharData("plungeraccess") == 0) {	// not set yet?  go check.
-		GM_get(server + '/' + to_place("knoll_friendly&action=dk_plunger"),function(response) {
-//            GM_log("plunger response:"+response);
-			if (response != "")	{
-                if (response.indexOf("the heck out of Dodge") == -1) {  //zombie plunger not available message
-    				SetCharData("plungeraccess","Y");
-                } else {
-                    SetCharData("plungeraccess","N");
-                }
-			} else {
-				SetCharData("plungeraccess","N");
-			}
-		});
-	}
 
 	// n.b. the :eq(1) below is important because of the nested-table layout.  only select the inner TR.
 	$('tr:contains("Noob."):eq(1)').append(AppendLink('[Toot]','tutorial.php?action=toot'));	// fresh from valhalla?  get things rolling.
@@ -2065,6 +2069,15 @@ function at_cobbsknob() {
 	$("td:contains('How embarrassing.'):last").append(AppendLink('[menagerie-2 (1)]',snarfblat(52)));
 }
 
+// KNOLLFRIENDLY: Auto-redirect if the Plunger is not available
+function at_knoll_friendly() {
+	var txt = $("tr:eq(1) > td:first > center tr:first").text();
+	if(txt && txt.indexOf("No, no, no.") !== -1) {
+		SetCharData("plungeraccess", "N");
+		document.location = 'craft.php?mode=combine';
+	}
+}
+
 // ADVENTURE: provide "Explore next square" link when we hit a non-combat in the Hidden City.
 // Also provide extra functionality for certain other noncombats.
 function at_adventure() {
@@ -2364,7 +2377,7 @@ function at_choice() {
 // Forest Village: Untinker linker.
 function at_forestvillage() {
 	var plunger = GetCharData("plungeraccess") == "Y" ? true: false;
-	var linkloc = plunger ? to_place("knoll_friendly&action=dk_innabox") :snarfblat(18);
+	var linkloc = plunger ? to_place("knoll_friendly&action=dk_innabox") : snarfblat(18);
 	var linkname = plunger ? "[get it from Innabox]" : "[degrassi knoll (1)]";
 	$('td:contains("just lost without my"):last').append(AppendLink(linkname,linkloc));
 	$('td:contains("luck finding my screw"):last').append(AppendLink(linkname,linkloc));
@@ -2384,47 +2397,95 @@ function at_town_wrong() {
 }
 
 // BHH: provide some convenience links here too.
-function at_bhh() {
+function at_bounty() {
+
+	InlineItemDescriptions();
+
 	var bountyloc = [
 		//item name, link display, adventure location ID
-		["bloodstained briquettes",         "[Knob Outskirts (1)]", "114"],
-		["empty greasepaint tubes",         "[Funhouse (1)]",       "20"],
+		["bean-shaped rocks",               "[chamber (1)]",         "33"],
+		["bloodstained briquettes",         "[outskirts (1)]",       "114"],
+		["broken petri dishes",             "[lab (1)]",             "50"],
+		["broken plunger handles",          "[restroom (1)]",        "351"],
+		["bundles of receipts",             "[treasury (1)]",        "260"],
+		["callused fingerbones",            "[border (1)]",          "45"],
+		["crumpled pink slips",             "[brawl (1)]",           "233"],
+		["drops of filthy ichor",           "[alley (1)]",           "112"],
+		["empty greasepaint tubes",         "[funhouse (1)]",        "20"],
+	//	["half-empty bottles of eyedrops",  "[gym (1)]",             ""],
+		["handfuls of meatberries",         "[conservatory (1)]",    "103"],
+		["important bat files",             "[junction (1)]",        "31"],
+		["pink bat eyes",                   "[entry (1)]",           "30"],
+		["pieces of triffid bark",          "[forest (1)]",          "15"],
+		["shredded can labels",             "[pantry (1)]",          "113"],
+		["suspicious moles",                "[menagerie (1)]",       "53"],
+
+		["absences of moss",                "[oasis (1)]",           "122"],
+		["bits of wilted lettuce",          "[palindome (1)]",       "119"],
+		["burned-out arcanodiodes",         "[airship (1)]",         "81"],
+		["coal buttons",                    "[snowmen (1)]",         "272"],
+		["discarded pacifiers",             "[castle:top (1)]",      "324"],
+		["dusty wings",                     "[desert (1)]",          "364"],
+		["disintegrating corks",            "[cellar (1)]",          "178"],
+		["lengths of bent pipe",            "[camp (1)]",            "12354"],
+		["non-Euclidean hooves",            "[gallery (1)]",         "106"],
+		["bits of sticky stardust",         "[hole (1)]",            "83"],
+		["beard crumbs",                    "[castle:basement (1)]", "322"],
+		["rusty tap handles",               "[bathroom (1)]",        "107"],
+	//	["spare abacus beads",              "[hidden city (1)]",     ""],
+		["spent handwarmers",               "[slope (1)]",           "273"],
+		["warrrrrts",                       "[poop deck (1)]",       "159"],
+		["worthless pieces of yellow glass","[dungeons of doom (1)]","39"],
+
+		/*
 		["chunks of hobo gristle",          "[Back Alley (1)]",     "112"],
 		["oily rags",                       "[Knoll (1)]",          "18"],
-		["pink bat eyes",                   "[Bathole Entry (1)]",  "30"],
-		["shredded can labels",             "[Pantry (1)]",         "113"],
-		["triffid barks",                   "[spooky forest (1)]",  "15"],
-		["bits of wilted lettuce",          "[Fern's Tower (1)]",   "22"],
-		["broken petri dishes",             "[Knob Lab (1)]",       "50"],
-		["bundles of receipts",             "[Knob Treasury (1)]",  "260"],
-		["callused fingerbones",            "[South Of Border (1)]","45"],
 		["empty aftershave bottles",        "[frat house (1)]",     "27"],
 		["greasy dreadlocks",               "[hippy camp (1)]",     "26"],
 		["vials of pirate sweat",           "[pirate's cove (1)]",  "66"],
 		["balls of white lint",             "[Whitey's Grove (1)]", "100"],
-		["worthless pieces of yellow glass","[Dungeons of Doom (1)]","39"],
 		["billy idols",                     "[Goatlet (1)]",        "271"],
-		["burned-out arcanodiodes",         "[Airship (1)]",        "81"],
-		["coal buttons",                    "[Ninja Snowmen (1)]",  "272"],
-		["discarded pacifiers",             "[Castle:Top (1)]",     "324"],
-		["disintegrating corks",            "[Wine Cellar (1)]",    "178"],
-		["non-Euclidean hooves",            "[Louvre (1)]",         "106"],
 		["sammich crusts",                  "[Roflmfao (1)]",       "80"],
-		["bits of sticky stardust",         "[Hole in the Sky (1)]","83"]
+		*/
 	];
 	// going back to see the BHH gives the relevant text in the first <p>.
+
+	// FIXME
+	// $('img[width=30][class!=hand]')
+	// FIXME
+
+	$('img[width=30][class!=hand]').each(function(n, el) {
+		var $img = $(this); if($img.attr("title") === "filthy lucre") return true;
+		var $td = $img.parent().parent().children("td:eq(1)");
+
+		var txt = $td.text();
+		if(txt) for (var i=0; i<bountyloc.length; i++) {
+			if (txt.indexOf(bountyloc[i][0]) !== -1) {
+				$td.append(AppendLink(bountyloc[i][1], snarfblat(bountyloc[i][2])));
+				break;
+			}
+		}
+	});
+
+
+
+/*
 	$('p:first').each(function() {
 		var p = $(this);
 		var txt = p.text();
 		for (var i=0; i<bountyloc.length; i++) {
-			if (txt.indexOf(bountyloc[i][0]) != -1) {
+			if (txt.indexOf(bountyloc[i][0]) !== -1) {
 				p.append(AppendLink(bountyloc[i][1],snarfblat(bountyloc[i][2])));
 				break;
 			}
 		}
 	});
+*/
+
 	// visiting the BHH for the first time gives the text in the first <td> of the second <table>.
 	// going back to see the BHH subsequently also gives the text in the first <td>, but that <td> also encompasses the rest of the form.
+
+/*
 	$('table:eq(1) td:first').each(function() {
 		var p = $(this);
 		var txt = p.text();
@@ -2436,6 +2497,8 @@ function at_bhh() {
 			}
 		}
 	});
+*/
+
 }
 
 function at_mall() {
@@ -2492,8 +2555,15 @@ function at_beerpong() {
 	}
 }
 
+function at_showplayer() {
+	InlineItemDescriptions();
+}
+
 // INVENTORY: Add shortcuts when equipping outfits
 function at_inventory() {
+
+	InlineItemDescriptions();
+
 	var firstTable = document.getElementsByTagName('table')[0];
 
 	var gearpage = 0; // Man, this is annoying.
@@ -2517,8 +2587,6 @@ function at_inventory() {
 			}
 		}
 	}
-
-	InlineItemDescriptions();
 
 	// Equipment page only
 	if (gearpage == 1) {
@@ -2691,6 +2759,9 @@ function at_inv_equip() {
 
 // GALAKTIK: Add use boxes when buying
 function at_galaktik() {
+
+	InlineItemDescriptions();
+
 	var row = $('table:first tr:eq(1):contains("You acquire")'), txt;
 	if (row.length == 1) {
 		var num = 1;
@@ -2778,6 +2849,9 @@ function pants(evt) {
 }
 // STORE: Add use boxes and links as appropriate
 function at_store() {
+
+	InlineItemDescriptions();
+
 	var firstTable = $('table:first tbody');		// we're interested in this when it's the "Results:" box from buying something.
 	var whichstore; var noform = 1;
 
@@ -3018,6 +3092,9 @@ function at_knoll() {
 
 // SHOP: link back to the 8-bit realm if we're at the mystic shop.
 function at_shop() {
+
+	InlineItemDescriptions();
+
 	if (document.location.search == "?whichshop=mystic") {
 		$('<center><br /><a href="adventure.php?snarfblat=73">Adventure in the 8-Bit Realm</a><br /><br /></center>').prependTo($('a:last').parent());
 	}
@@ -3987,31 +4064,13 @@ function at_oldman() {
 }
 
 // MANOR: If manor is not present, redirect to town.
-function at_manor() {
+function at_spookyraven1() {
 	if (document.body.textContent.length == 0)
 		mainpane_goto('/town_right.php');
-	else if (GetPref('zonespoil') == 1) {
-		$('img').each(function() {
-			var img = $(this);
-			var src = img.attr('src');
-			if (src.indexOf("sm1.gif") != -1)
-				img.attr('title','ML: 105-115');
-			else if (src.indexOf("sm4.gif") != -1)
-				img.attr('title','ML: 20');
-			else if (src.indexOf("sm3.gif") != -1)
-				img.attr('title','ML: 7-9');
-			else if (src.indexOf("sm6.gif") != -1)
-				img.attr('title','ML: 3-5');
-			else if (src.indexOf("sm7.gif") != -1)
-				img.attr('title','ML: 49-57');
-			else if (src.indexOf("sm9.gif") != -1)
-				img.attr('title','ML: 1-2');
-		});
-	}
 }
 
 // MANOR3: display wine-bottle glyph info.
-function at_manor3() {
+function at_spookyraven3() {
 // basic spoilers, part 1: display glyphs while selecting the wines.
 	var wineDB = {'2275':'278847834','2271':'163456429','2276':'147519269',
 				  '2273':'905945394','2272':'289748376','2274':'625138517'};
@@ -5066,14 +5125,12 @@ var Krakrox = {
 
 
 // SPOIL_(ZONE): Display ML on mouseover.
-function spoil_place() {
-	var whichplace = document.location.search;
-	whichplace = whichplace.split('&',1)[0];	//?whichplace=foo&action=bar -> ?whichplace=foo
-	whichplace = whichplace.split('=',2)[1];	//?whichplace=foo -> foo
-	var handler = global["spoil_" + whichplace];
-	if (handler && typeof handler == "function") {
-		handler();
-	}
+function spoil_town_wrong() {
+    $('#townwrong_9 img').attr('title','ML: 1');
+}
+function spoil_tutorial() {
+    $('img[title^="Noob"]')		.attr('title','ML: 0');
+    $('img[title^="The Dire"]')	.attr('title','ML: 1');
 }
 
 function spoil_hiddencity() {
@@ -5090,18 +5147,18 @@ function spoil_hiddencity() {
 }
 
 function spoil_canadia() {
-    $('#lc_outskirts > a > img').attr('title','ML: 2-3');
-    $('#lc_camp > a > img').attr('title','ML: 35-40');
+    $('#lc_outskirts img')	.attr('title','ML: 2-3');
+    $('#lc_camp img')		.attr('title','ML: 35-40');
 }
 
 function spoil_marais() {
-    $('#swamp1 > a > img').attr('title','ML: 14-20; open swamp, sanctuargh');   //edge
-    $('#swamp2 > a > img').attr('title','ML: 19-36; open bog, tower');          //swamp
-    $('#swamp3 > a > img').attr('title','ML: 34-51; fight Bunion (axe)');       //bog
-    $('#swamp4 > a > img').attr('title','ML: 27-55; get navigator for beaver maze');    //wizard tower
-    $('#swamp5 > a > img').attr('title','ML: 19-37; open beavers, village');    //sanctuarrrrgh
-    $('#swamp6 > a > img').attr('title','ML: 27-54; fight hippy (wood)');       //beaver
-    $('#swamp7 > a > img').attr('title','ML: 36-58; fight skunk (bouquet)');    //village
+    $('#swamp1 img').attr('title','ML: 14-20; open swamp, sanctuargh');   //edge
+    $('#swamp2 img').attr('title','ML: 19-36; open bog, tower');          //swamp
+    $('#swamp3 img').attr('title','ML: 34-51; fight Bunion (axe)');       //bog
+    $('#swamp4 img').attr('title','ML: 27-55; get navigator for beaver maze');    //wizard tower
+    $('#swamp5 img').attr('title','ML: 19-37; open beavers, village');    //sanctuarrrrgh
+    $('#swamp6 img').attr('title','ML: 27-54; fight hippy (wood)');       //beaver
+    $('#swamp7 img').attr('title','ML: 36-58; fight skunk (bouquet)');    //village
 }
 
 function spoil_bugbearship() {
@@ -5127,7 +5184,16 @@ function spoil_orc_chasm() {
 	$('#smut_orc_camp > a > img').attr('title','ML: 75-85');
 }
 
-function spoil_manor2() {
+function spoil_spookyraven1() {
+	$('#sr1_pantry img')		.attr('title','ML: 1-2');
+	$('#sr1_kitchen img')		.attr('title','ML: 3-5');
+	$('#sr1_conservatory img')	.attr('title','ML: 7-9');
+	$('#sr1_billiards img')		.attr('title','ML: 20');
+	$('#sr1_library img')		.attr('title','ML: 49-57');
+	$('#sr1_gallery img')		.attr('title','ML: 105-115');
+}
+
+function spoil_spookyraven2() {
 	$('img').each(function() {
 		var ml = null; var src = this.getAttribute('src');
 		if (src.indexOf("sm2_1") != -1) ml = '147-173';
@@ -5137,7 +5203,7 @@ function spoil_manor2() {
 	});
 }
 
-function spoil_manor3() {
+function spoil_spookyraven3() {
 	var msg = null;
 	$('img').each(function() {
 		var ml = null;
@@ -5175,11 +5241,11 @@ function spoil_pyramid() {
 }
 
 function spoil_bathole() {
-    $('#bathole_entryway > a > img').attr('title','ML: 11-16');
-    $('#bathole_junction > a > img').attr('title','ML: 14-18');
-    $('#bathole_burrow > a > img').attr('title','ML: 16-20');
-    $('#bathole_chamber > a > img').attr('title','ML: 22');
-    $('#bathole_lair > a > img').attr('title','ML: 26-35');
+    $('#bathole_entryway img')	.attr('title','ML: 11-16');
+    $('#bathole_junction img')	.attr('title','ML: 14-18');
+    $('#bathole_burrow img')	.attr('title','ML: 16-20');
+    $('#bathole_chamber img')	.attr('title','ML: 22');
+    $('#bathole_lair img')		.attr('title','ML: 26-35');
 }
 
 function spoil_plains() {
@@ -5202,6 +5268,7 @@ function spoil_plains2() {
 	});
 }
 
+/* // DEPRECATED; confirm that these are no longer needed
 function spoil_knob() {
 	$('img').each(function() {
 		var ml = null; var src = this.getAttribute('src');
@@ -5224,6 +5291,7 @@ function spoil_knob2() {
 		else if (src.indexOf("shaft2") != -1) ml = '30';
 		if (ml) this.setAttribute('title','ML: '+ml);
 });	}
+*/
 
 function spoil_cobbsknob() {
 	$('area').each(function() {
@@ -5245,6 +5313,7 @@ function spoil_cobbsknob() {
 }
 
 // this is for the old, pre-revamp version of the cyrpt.
+/*
 function spoil_cyrpt() {
 	$('img').each(function() {
 		var ml = null; var src = this.getAttribute('src');
@@ -5256,6 +5325,7 @@ function spoil_cyrpt() {
 		if (ml) this.setAttribute('title','ML: '+ml);
 	});
 }
+*/
 
 // this is for the new, post-revamp version of the cyrpt.
 function spoil_crypt() {
@@ -5594,6 +5664,9 @@ function at_topmenu() {
 		SetCharData("altar4",'');
 		SetCharData("nunmoney",0);
 	}
+	if (integer(GetCharData('level')) < 2 || GetCharData("plungeraccess") == undefined) {
+		CanHazPlunger();
+	}
 	var compactmode = document.getElementsByName('loc').length; // compact mode has a dropdown listbox called 'loc', full mode doesn't.
 	if (compactmode > 0) {
 		at_compactmenu();
@@ -5807,14 +5880,22 @@ function at_topmenu() {
 		toprow1.appendChild(document.createElement('br'));
 		var poop = document.createElement('span'); poop.innerHTML = "&nbsp;";
 		toprow1.appendChild(poop);
-		AddTopLink(toprow1, 'mainpane', 'multiuse.php', 'multi-use', 1);
-		AddTopLink(toprow1, 'mainpane', 'craft.php?mode=combine', 'combine', 1);
-		AddTopLink(toprow1, 'mainpane', 'sellstuff.php', 'sell', 1);
-		AddTopLink(toprow1, 'mainpane', 'craft.php?mode=cook', 'cook', 1);
-		AddTopLink(toprow1, 'mainpane', 'craft.php?mode=cocktail', 'mix', 1);
-		AddTopLink(toprow1, 'mainpane', 'craft.php?mode=smith', 'smith', 1);
-		AddTopLink(toprow1, 'mainpane', 'council.php', 'council', 1);
-		AddTopLink(toprow1, 'mainpane', 'guild.php', 'guild', 1);
+						AddTopLink(toprow1, 'mainpane', 'multiuse.php', 'multi-use', 1);
+		var aPaste =	AddTopLink(toprow1, 'mainpane', 'craft.php?mode=combine', 'combine', 1);
+						AddTopLink(toprow1, 'mainpane', 'sellstuff.php', 'sell', 1);
+		var aCook =		AddTopLink(toprow1, 'mainpane', 'craft.php?mode=cook', 'cook', 1);
+		var aBooze =	AddTopLink(toprow1, 'mainpane', 'craft.php?mode=cocktail', 'mix', 1);
+		var aSmith =	AddTopLink(toprow1, 'mainpane', 'craft.php?mode=smith', 'smith', 1);
+						AddTopLink(toprow1, 'mainpane', 'council.php', 'council', 1);
+						AddTopLink(toprow1, 'mainpane', 'guild.php', 'guild', 1);
+
+		// Right craft links to do discoveries instead
+		$([aPaste,aCook,aBooze,aSmith]).on("contextmenu", function(e) {
+			e.preventDefault();
+			top.frames[2].location = this.href.replace('mode=', 'mode=discoveries&what=');
+			return false;
+		});
+
 		if (haveLair == 1 && integer(GetCharData('level')) == 13)
 			AddTopLink(toprow1, 'mainpane', 'lair2.php?action=door', 'door', 1);
 
@@ -6088,13 +6169,14 @@ function buildPrefs() {
         var scripts = document.querySelector('ul').appendChild(document.createElement('li'));
         scripts.id = 'scripts';
         var a = scripts.appendChild(document.createElement('a'));
-        a.href = '#';
+        a.href = 'javascript:void(0);';
         var img = a.appendChild(document.createElement('img'));
         img.src = 'http://images.kingdomofloathing.com/itemimages/cmonkey1.gif';
         img.align = 'absmiddle';
         img.border = '0';
         img.style.paddingRight = '10px';
         a.appendChild(document.createTextNode('Scripts'));
+        a.style = 'padding: 10px 15px 10px 0';
         a.addEventListener('click', function (e) {
              //make our new tab active when clicked, clear out the #guts div and add our settings to it
             e.stopPropagation();
@@ -6117,6 +6199,10 @@ function buildPrefs() {
     }
 
 	function createPrefPage(prefSpan) {
+
+		// Reset only new prefs that the user has never seen before
+		Defaults(0);
+
 		var choice = MakeOption("Clicking Number Boxes: ", 3, 'autoclear', "Does Zilch", "Clears");
 		var select = choice.firstChild.cells[1].firstChild;
 		select.options[2].innerHTML = "Highlights";
@@ -6137,6 +6223,8 @@ function buildPrefs() {
 		select = choice.firstChild.cells[1].firstChild;
 		select.options[2].innerHTML = "On (Right)";
 		prefSpan.appendChild(choice);
+
+		prefSpan.appendChild(MakeOption("Inline Item Descriptions: ", 2, 'inlineitemdesc', "Off", "On"));
 
 		prefSpan.appendChild(MakeOption("Split Inventory Link: ", 2, 'splitinv', "Off", "On"));
 		prefSpan.appendChild(MakeOption("Split Quest Link: ", 2, 'splitquest', "Off", "On"));
@@ -6390,11 +6478,11 @@ function autoclear_added_rows() {
 		// A mouseout event is the easy way out, since I couldn't find a way
 		// to trigger the event AFTER the extra row was added. Meh.
 		link.mouseout(function()
-		{	var autoclear = GetPref('autoclear');
-			if (autoclear == 0) return;
+		{	var prefAutoclear = GetPref('autoclear');
+			if (prefAutoclear == 0) return;
 			$('input[value=1][type=text]').each(function()
 			{	if (this.getAttribute('onclick') == null)
-					AddAutoClear(this, autoclear);
+					AddAutoClear(this, prefAutoclear);
 			});
 		});
 	});
