@@ -999,7 +999,7 @@ function AddLinks(descId, theItem, formWhere, path) {
 			addWhere.append(AppendLink('[eat]','inv_eat.php?pwd='+ pwd +
 							'&which=1&whichitem='+itemNum)); break;
 		case 2054:                                                              // black market map
-            //add link to switch to blackbird or crow
+			//add link to switch to blackbird or crow
 			addWhere.append(AppendLink('[switch to blackbird]','familiar.php?action=newfam&newfam=59'));
 				break;
 
@@ -1445,7 +1445,7 @@ function InlineItemDescriptions() {
 			var onclick = $img.attr("onclick");
 			if(onclick && onclick.indexOf("descitem(") !== -1) {
 
-				var item = onclick.match(/descitem\(([0-9]*)/)[1];
+				var item = onclick.match(/descitem\(\"?([a-z0-9\-_]*)/)[1];
 				if(!item) return true;
 
 				var $body = $("body");
@@ -1522,7 +1522,8 @@ function InlineItemDescriptions() {
 
 					var $b = $desc.find("b:first")
 					$b.wrap('<a href="http://kol.coldfront.net/thekolwiki/index.php/Special:'+
-						'Search?search='+ $b.text().replace(/\s/g, '+') +'&go=Go" target="_blank"></a>');
+						'Search?search='+ $b.text().replace(/\s/g, '+').replace('"', '')+
+						'&go=Go" target="_blank"></a>');
 
 					window.$overlay.show();
 
@@ -1621,6 +1622,9 @@ function setItem(sel, itemName) {
 
 // FIGHT: special processing for certain critters
 function at_fight() {
+
+	InlineItemDescriptions();
+
 // code for NS Lair spoilers borrowed shamelessly from Tard's NS Trainer v0.8
 	// monster name:[preferred combat item, funkslinging item, is this lair-spoilery, special treatment flag]
 	// special treatment: 0=nothing; 1=any gremlin; 2=non-tool gremlin; 3=hidden city; 4=pirate insults.
@@ -2230,13 +2234,14 @@ function at_adventure() {
 		if (square.indexOf("hiddencity") != -1) link_hiddencity(square);
 	//	if (square.indexOf("cellar.php") != -1) link_cellar(square);
 	}
-	var NCTitle = $('b:eq(1)');
-	//GM_log("NCTtext=["+$(NCTitle).text()+"]");
-	switch ($(NCTitle).text()) {
+	var $NCTitle = $('b:eq(1)');
+	var NCText = $NCTitle.text();
+//	console.log("NCTtext=["+$NCTitle.text()+"]");
+	switch (NCText) {
 	case "Rotting Matilda":
 		var cardlink = document.createElement('table');
 		cardlink.innerHTML = '<table class="item" style="float: none" rel="id=1963&s=55&q=0&d=1&g=0&t=1&n=1&m=0&u=u"><tr><td><img src="http://images.kingdomofloathing.com/itemimages/guildapp.gif" alt="dance card" title="dance card" class=hand onClick="descitem(223939661)"></td></tr></table>';
-		NCTitle.append(cardlink);
+		$NCTitle.append(cardlink);
 		$(cardlink).attr('rel','id=1963&s=55&q=0&d=1&g=0&t=1&n=1&m=0&p=0&u=u').addClass('item');
 		break;
 	case "It's Always Swordfish":
@@ -2289,16 +2294,16 @@ function at_adventure() {
 		nextZoneName = p1.match(/This must be (\w+),/)[1];
 		$('a:contains("Adventure Again")').replaceWith('<a href="adventure.php?snarfblat=320">Adventure in '+nextZoneName+'</a>');
 		break;
-    case "Sphinx for the Memories":
+	case "Sphinx for the Memories":
 		$('a:contains("Adventure Again")').replaceWith('<a href="adventure.php?snarfblat=320">Adventure in the next zone</a>');
 		break;
 	case "Top of the Castle, Ma":
 		$('<center><a href="'+snarfblat(324)+'">Adventure on the TOP FLOOR</a></center><br />').prependTo($('a:last').parent());
 		break;
-    case "Plucked":
+	case "Plucked":
 		$('<center><a href="cobbsknob.php?action=throneroom">Take out the KING</a></center><br />').prependTo($('a:last').parent());
 		break;
-    case "This Adventure Bites":
+	case "This Adventure Bites":
 		$('<br /><center><p><font color="blue">You need:<br/>frilly skirt equipped, and 3 hot wings OR<br/>orcish frat boy outfit equipped OR<br/>mullet wig equipped, and a briefcase<br/>before using those blueprints</font></center>').appendTo($('a:last').parent());
 		break;
 	case "A Sietch in Time": // put stuff here
@@ -2458,11 +2463,17 @@ function at_arcade() {
 function at_choice() {
 	var square = GetCharData("square");
 	SetCharData("square",false);
+	var $NCTitle = $('b:eq(0)');
+	var NCText = $NCTitle.text();
+
+	$NCTitle.wrap('<a style="color:white;" href="http://kol.coldfront.net/thekolwiki/index.php/'+
+	 'Special:Search?search='+ NCText.replace(/\s/g, '+').replace('"', '') +'&go=Go" '+
+	 'target="_blank"></a>');
+
 	if (square) {
 		if (square.indexOf("hiddencity") != -1) link_hiddencity(square);
 		if (square.indexOf("cellar.php") != -1) {
-			var NCTitle = $('b:eq(0)').text();		// check the title of the choice adventure:
-			if (NCTitle != "Results:") {
+			if (NCText != "Results:") {
 				SetCharData("square",square);	// not "Results:" means it's the choosing half of the choice, where you don't need links.
 												// but it will be "Results:" after we choose something, so pass our Square data onward.
 			} else {
@@ -2558,7 +2569,7 @@ function at_choice() {
 		} else if (p0text.indexOf("weird pink-headed guys") != -1) { // big brother sea monkey
 			$('<center><a href="monkeycastle.php?who=1">See Little Brother</a></center><br />')
 				.prependTo($('a:contains("Adventure Again")').parent());
-        } else if ((choicetext.indexOf("You glimpse a giant chore wheel on the wall") != -1) ||
+		} else if ((choicetext.indexOf("You glimpse a giant chore wheel on the wall") != -1) ||
 				(choicetext.indexOf("You see a chore wheel hanging high on the wall") != -1))
 		{
 			$('<center><a href="'+snarfblat(323)+'">Adventure on the GROUND FLOOR</a></center><br />')
@@ -2576,13 +2587,13 @@ function at_choice() {
 			var clueText = /You do find an (\.*?),/.match(choicetext)[1];
 			clueText = "<br /><font color='blue'>You found <b>" + clueText + "</b></font><br/>";
 			$(clueText).appendTo($(p).find(':last'));
-        } else if (choicetext.indexOf('Having finally fought your way') != -1) {
+		} else if (choicetext.indexOf('Having finally fought your way') != -1) {
 			var p1 = $('p:contains("Having finally fought")').text;
 			nextZoneName = p1.match(/This must be (\w+),/)[1];
 		//	GM_log("zone name = " + nextZoneName);
 			$('a:contains("Adventure Again")')
 				.replaceWith('<a href="adventure.php?snarfblat=320">Adventure in '+nextZoneName+'</a>');
-        } else if (p0text.indexOf("Then good luck to you on your travels") != -1) {
+		} else if (p0text.indexOf("Then good luck to you on your travels") != -1) {
 			//probably got something from Gnasir!
 			p0.appendChild(AppendLink('[use pamphlet]',inv_use(6854)));
 		} else {
@@ -2636,8 +2647,7 @@ function at_bounty() {
 		["crumpled pink slips",             "[brawl (1)]",           "233"],
 		["drops of filthy ichor",           "[alley (1)]",           "112"],
 		["empty greasepaint tubes",         "[funhouse (1)]",        "20"],
-	// FIXME
-	//	["half-empty bottles of eyedrops",  "[gym (1)]",             ""],
+		["half-empty bottles of eyedrops",  "[gym (1)]",             "353"],
 		["handfuls of meatberries",         "[conservatory (1)]",    "103"],
 		["important bat files",             "[junction (1)]",        "31"],
 		["pink bat eyes",                   "[entry (1)]",           "30"],
@@ -2908,7 +2918,7 @@ function at_inventory() {
 		var goHere = checkForRedirects(resultsText);
 		if (goHere != "") {
 			mainpane_goto(goHere);
-//            parent.frames[2].location = 'http://' + server + goHere;
+		//	parent.frames[2].location = 'http://' + server + goHere;
 		}
 // and this is where we add all the nifty little links after equipping something.
 		else if (resultsText.indexOf("You equip an item") != -1) {
@@ -3106,6 +3116,11 @@ function pants(evt) {
 	evt.stopPropagation();
 	evt.preventDefault();
 }
+
+function at_mrstore() {
+	InlineItemDescriptions();
+}
+
 // STORE: Add use boxes and links as appropriate
 function at_store() {
 
@@ -3347,6 +3362,10 @@ function at_knoll_friendly() {
 	if(txt && txt.indexOf("No, no, no.") !== -1) {
 		document.location = 'craft.php?mode=combine';
 	}
+}
+
+function at_cafe() {
+	InlineItemDescriptions();
 }
 
 // SHOP: link back to the 8-bit realm if we're at the mystic shop.
@@ -4245,6 +4264,9 @@ function at_clan_viplounge() {
 
 // CHARSHEET: decode resistance level text.
 function at_charsheet() {
+
+	InlineItemDescriptions();
+
 	// see if the character qualifies for the Myst-Class innate 5% resistance bonus...
 	var mystBonus = 0;
 	var HPMPstats = $("table table table td:lt(10)").text();
@@ -5469,7 +5491,7 @@ function spoil_orc_chasm() {
 }
 
 function spoil_spookyraven1() {
-    spoil_manor();
+	spoil_manor();
 }
 function spoil_manor() {
 	$('#sr1_pantry img')		.attr('title','ML: 1-2');
@@ -5482,7 +5504,7 @@ function spoil_manor() {
 
 
 function spoil_spookyraven2() {
-    spoil_manor2();
+	spoil_manor2();
 }
 function spoil_manor2() {
 	$('img').each(function() {
@@ -5881,7 +5903,7 @@ function at_desc_effect() {
 function linkKOLWiki() {
   var b = $('b:first');
   b.wrap('<a href="http://kol.coldfront.net/thekolwiki/index.php/'+
-	 'Special:Search?search='+ b.text().replace(/\s/g, '+') +'&go=Go" '+
+	 'Special:Search?search='+ b.text().replace(/\s/g, '+').replace('"', '') +'&go=Go" '+
 	 'target="_blank"></a>');
 }
 
@@ -6158,28 +6180,28 @@ function at_topmenu() {
 		a.setAttribute('target','mainpane');
 		toprow1.appendChild(a);
 		GM_get(server+to_place('forestvillage&action=fv_friar'), function(t) {
-            if (t.length>10 && t.indexOf("Back to the Distant Woods") == -1) {
-                $('#florist').html('florist')
-                    .attr('href',to_place('forestvillage&action=fv_friar'));
-                SetCharData("hasflorist",true);
-            } else {
-                SetCharData("hasflorist",false);
-            }
-        });
-        toprow1.appendChild(document.createTextNode(" "));
+			if (t.length>10 && t.indexOf("Back to the Distant Woods") == -1) {
+				$('#florist').html('florist')
+					.attr('href',to_place('forestvillage&action=fv_friar'));
+				SetCharData("hasflorist",true);
+			} else {
+				SetCharData("hasflorist",false);
+			}
+		});
+		toprow1.appendChild(document.createTextNode(" "));
 
 		a = document.createElement('a');
-        a.innerHTML = "more";
-        a.setAttribute('href','#');
+		a.innerHTML = "more";
+		a.setAttribute('href','#');
 		a.addEventListener('click', function(event) {
 			var tr1 = document.getElementsByName("toprow1")[0];
 			var tr2 = document.getElementsByName("toprow2")[0];
 			tr1.style.display = "none";
-            tr2.style.display = "inline";
+			tr2.style.display = "inline";
 			SetPref('toprow', 2);
 		}, true);
-        toprow1.appendChild(a);
-        toprow1.appendChild(document.createTextNode(" "));
+		toprow1.appendChild(a);
+		toprow1.appendChild(document.createTextNode(" "));
 
 		toprow2.setAttribute("name","toprow2");
 		if (front != 2) toprow2.setAttribute("style","display: none;");
@@ -6200,17 +6222,17 @@ function at_topmenu() {
 		AddTopLink(toprow2, '_blank', 'http://forums.kingdomofloathing.com', 'forums', 1);
 		AddTopLink(toprow2, '_blank', 'radio.php', 'radio', 1);
 
-        a = document.createElement('a');
-        a.innerHTML = "more";
-        a.setAttribute('href','#');
+		a = document.createElement('a');
+		a.innerHTML = "more";
+		a.setAttribute('href','#');
 		a.addEventListener('click', function(event) {
 			var tr2 = document.getElementsByName("toprow2")[0];
 			var tr1 = document.getElementsByName("toprow1")[0];
 			tr2.style.display = "none";
-            tr1.style.display = "inline";
+			tr1.style.display = "inline";
 			SetPref('toprow', 1);
 		}, true);
-        toprow2.appendChild(a);
+		toprow2.appendChild(a);
 
 		// Actually add the stuffy-stuff to the span we grabbed earlier
 		weBuildHere.appendChild(toprow1);
@@ -6385,56 +6407,56 @@ function at_compactmenu() {
 		AddTopOption("Hippy Store", "store.php?whichstore=h", selectItem, 0);
 		AddTopOption("Display Case", "managecollection.php", selectItem, 0);
 		AddTopOption("Hagnk","storage.php",selectItem,0);
-        GM_get(server+to_place('forestvillage&action=fv_friar'), function(t) {
-            if (t.length>10 && t.indexOf("Back to the Distant Woods") == -1) {
-                AddTopOption("Florist",to_place('forestvillage&action=fv_friar'),selectItem, 0);
-                SetCharData("hasflorist",true);
-            } else {
-                SetCharData("hasflorist",false);
-            }
-        });
+		GM_get(server+to_place('forestvillage&action=fv_friar'), function(t) {
+			if (t.length>10 && t.indexOf("Back to the Distant Woods") == -1) {
+				AddTopOption("Florist",to_place('forestvillage&action=fv_friar'),selectItem, 0);
+				SetCharData("hasflorist",true);
+			} else {
+				SetCharData("hasflorist",false);
+			}
+		});
 	}
 }
 
 // ------------------------------
 
 function buildPrefs() {
-    if (!document.querySelector('#privacy')) return;
-    var scriptID = "MrScript";
-    var scriptName = "Mr. Script's Choicetastic Optionarium";
-    if (!document.querySelector('#scripts')) {
-        //scripts tab is not built, do it here
-        var scripts = document.querySelector('ul').appendChild(document.createElement('li'));
-        scripts.id = 'scripts';
-        var a = scripts.appendChild(document.createElement('a'));
-        a.href = 'javascript:void(0);';
-        var img = a.appendChild(document.createElement('img'));
-        img.src = 'http://images.kingdomofloathing.com/itemimages/cmonkey1.gif';
-        img.align = 'absmiddle';
-        img.border = '0';
-        img.style.paddingRight = '10px';
-        a.appendChild(document.createTextNode('Scripts'));
-        a.style = 'padding: 10px 15px 10px 0';
-        a.addEventListener('click', function (e) {
-             //make our new tab active when clicked, clear out the #guts div and add our settings to it
-            e.stopPropagation();
-            document.querySelector('.active').className = '';
-            document.querySelector('#scripts').className = 'active';
-            document.querySelector('#guts').innerHTML = '<div class="scaffold"></div>';
-            document.querySelector('#guts').appendChild(buildSettings());
-            //click handler for everything in this section
-            //document.querySelector('#' + scriptID).addEventListener('click', changeSettings, false);
-        }, false);
-    } else {
-        //script tab already exists
-        document.querySelector('#scripts').firstChild.addEventListener('click', function (e) {
-            //some other script is doing the activation work, just add our settings
-            e.stopPropagation();
-            document.querySelector('#guts').appendChild(buildSettings());
-            //click handler for everything in this section
-            //document.querySelector('#' + scriptID).addEventListener('click', changeSettings, false);
-        }, false);
-    }
+	if (!document.querySelector('#privacy')) return;
+	var scriptID = "MrScript";
+	var scriptName = "Mr. Script's Choicetastic Optionarium";
+	if (!document.querySelector('#scripts')) {
+		//scripts tab is not built, do it here
+		var scripts = document.querySelector('ul').appendChild(document.createElement('li'));
+		scripts.id = 'scripts';
+		var a = scripts.appendChild(document.createElement('a'));
+		a.href = 'javascript:void(0);';
+		var img = a.appendChild(document.createElement('img'));
+		img.src = 'http://images.kingdomofloathing.com/itemimages/cmonkey1.gif';
+		img.align = 'absmiddle';
+		img.border = '0';
+		img.style.paddingRight = '10px';
+		a.appendChild(document.createTextNode('Scripts'));
+		a.style = 'padding: 10px 15px 10px 0';
+		a.addEventListener('click', function (e) {
+			//make our new tab active when clicked, clear out the #guts div and add our settings to it
+			e.stopPropagation();
+			document.querySelector('.active').className = '';
+			document.querySelector('#scripts').className = 'active';
+			document.querySelector('#guts').innerHTML = '<div class="scaffold"></div>';
+			document.querySelector('#guts').appendChild(buildSettings());
+			//click handler for everything in this section
+			//document.querySelector('#' + scriptID).addEventListener('click', changeSettings, false);
+		}, false);
+	} else {
+		//script tab already exists
+		document.querySelector('#scripts').firstChild.addEventListener('click', function (e) {
+			//some other script is doing the activation work, just add our settings
+			e.stopPropagation();
+			document.querySelector('#guts').appendChild(buildSettings());
+			//click handler for everything in this section
+			//document.querySelector('#' + scriptID).addEventListener('click', changeSettings, false);
+		}, false);
+	}
 
 	function createPrefPage(prefSpan) {
 
@@ -6613,10 +6635,10 @@ function buildPrefs() {
 		centeredlinks.appendChild(ulspan);
 	}
 
-    function buildSettings() {
-        //build our settings and return them for appending
-        var guts = document.createElement("div");
-        guts.id = scriptID;
+	function buildSettings() {
+		//build our settings and return them for appending
+		var guts = document.createElement("div");
+		guts.id = scriptID;
 		var subhead = document.createElement("div");
 		guts.appendChild(subhead);
 		subhead.className = "subhead";
@@ -6683,8 +6705,8 @@ function buildPrefs() {
 		outerdiv.appendChild(bigSpan);
 
 		guts.appendChild(outerdiv);
-        return guts;
-    }
+		return guts;
+	}
 }
 
 // ---------------
