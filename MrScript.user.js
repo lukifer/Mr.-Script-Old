@@ -580,6 +580,7 @@ function AppendBuyBox(itemNumber, whichStore, buttonText, noQuantityBox) {
 
 // NUMBERLINK: Fine, you think of a good function name.
 // causes clicking on a number to fill that number in to the first "quantity" or "itemquantity" field available.
+/*
 function NumberLink(b) {
 	var num = b.textContent.split(' ')[0];
 	while(num.indexOf(',') != -1) num = num.split(',')[0] + num.split(',')[1];
@@ -593,6 +594,7 @@ function NumberLink(b) {
 		b.innerHTML = "<a href='javascript:void(0);' onclick='" + func + "'>" + num + "</a>" + txt;
 	}
 }
+*/
 
 // APPENDOUTFITSWAP: Aren't unified interfaces just keen?
 function AppendOutfitSwap(outfitNumber, text) {
@@ -1443,9 +1445,22 @@ function InlineItemDescriptions() {
 			var $img = $(e.target);
 			window.$img = $img;
 			var onclick = $img.attr("onclick");
-			if(onclick && onclick.indexOf("descitem(") !== -1) {
+			var regex = false;
+			var which = false;
+			if(onclick) {
+				if(onclick.indexOf("descitem(") !== -1) {
+					which = 'item';
+					regex = /descitem\(\"?([a-z0-9\-_]*)/;
+				}
+				else if(onclick.indexOf("eff(") !== -1) {
+					which = 'effect';
+					regex = /eff\(\"?([a-z0-9\-_]*)/;
+				}
+			}
 
-				var item = onclick.match(/descitem\(\"?([a-z0-9\-_]*)/)[1];
+			if(regex) {
+
+				var item = onclick.match(regex)[1];
 				if(!item) return true;
 
 				var $body = $("body");
@@ -1472,8 +1487,9 @@ function InlineItemDescriptions() {
 						setTimeout(function(){ $desc.remove(); }, 120);
 					});
 
-					$(document).on("keyup", function(e) {
+					$(document).on("keyup.descitem", function(e) {
 						if(e.keyCode == 27) window.$overlay.triggerHandler("click");
+						$(document).off("keyup.descitem");
 					});
 
 					$body
@@ -1502,17 +1518,33 @@ function InlineItemDescriptions() {
 					});
 				$body.append($desc[0]);
 
-				var url = '/desc_item.php?whichitem='+item;
+				var url = '/desc_'+which+'.php?which'+which+'='+item;
 				GM_get(server+url, function(html) {
-					var start = html.indexOf('<center>');
-					var end	= html.lastIndexOf('</blockquote>');
 
-					$desc
-						.html(html.slice(start, end - - 13))
-						.css({"top": y, "left": parseInt(x), "display": "block" });
-					$desc
-						.children("blockquote")
-						.css("margin", "15px");
+					if(which == "item") {
+						var start = html.indexOf('<center>');
+						var end	= html.lastIndexOf('</blockquote>');
+
+						$desc
+							.html(html.slice(start, end - - 13))
+							.css({"top": y, "left": parseInt(x), "display": "block" });
+						$desc
+							.children("blockquote")
+							.css("margin", "15px");
+					}
+
+					else if(which == "effect") {
+						var start = html.indexOf('<font');
+						var end	= html.lastIndexOf('</font>');
+
+						$desc
+							.html(html.slice(start, end - - 7))
+							.css({"top": y, "left": parseInt(x), "display": "block" });
+
+						$desc
+							.find("center:eq(1)")
+							.css("marginBottom", "15px");
+					}
 
 					$desc.css({
 						"top": y - ($desc.height() / 2),
@@ -1524,6 +1556,25 @@ function InlineItemDescriptions() {
 					$b.wrap('<a href="http://kol.coldfront.net/thekolwiki/index.php/Special:'+
 						'Search?search='+ $b.text().replace(/\s/g, '+').replace('"', '')+
 						'&go=Go" target="_blank"></a>');
+
+					$desc.find("a").each(function(n, el) {
+						var $a = $(this);
+						var url = $a.attr("href");
+
+						if(url.indexOf("desc_effect") !== -1) {
+							$a.attr("href", "javascript:void(0);");
+							$a.on("click", function(e) {
+								GM_get(server+url, function(html) {
+									var start = html.indexOf('<font');
+									var end	= html.lastIndexOf('</font>');
+									$desc.html(html.slice(start, end - - 7));
+									$desc.find("center:eq(1)").css("marginBottom", "15px");
+								});
+							});
+						}
+
+						else $a.attr("target", "_blank");
+					});
 
 					window.$overlay.show();
 
@@ -3149,9 +3200,9 @@ function at_store() {
 	// right-click on the image of the shopkeeper to put on your travoltan trousers without leaving the store.
 
 	$("img[src*='otherimages']:first")
-	.attr('title','right-click to equip Travoltan Trousers')
-	.attr('id','proprietor')
-	.bind('contextmenu',pants);
+		.attr('title','right-click to equip Travoltan Trousers')
+		.attr('id','proprietor')
+		.bind('contextmenu',pants);
 
 	if (GetPref('shortlinks') > 1 && firstTable != undefined &&
 		firstTable.children('tr:first').text() == "Market Results:" &&
@@ -3186,8 +3237,8 @@ function at_store() {
 
 		if (descId != undefined) {
 			var whut = AddLinks(descId, bText.parent().parent().get(0), acquireText, thePath);
-			if ((whut == 'skill' || whut == 'use') && firstTable.children('tr:eq(1)').text().indexOf("an item:") == -1)
-				NumberLink(bText.get(0));
+			//if ((whut == 'skill' || whut == 'use') && firstTable.children('tr:eq(1)').text().indexOf("an item:") == -1)
+				//NumberLink(bText.get(0));
 		}
 	}
 
