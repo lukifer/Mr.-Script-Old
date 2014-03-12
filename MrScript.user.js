@@ -1727,8 +1727,14 @@ function at_fight() {
 	"a tipsy pirate":           ["The Big Book of Pirate Insults","",0,4]
 	};
 
-	var monsterName = document.getElementById('monname').innerHTML;
+	var $monster = $("#monname");
+	var monsterName = $monster.text();
+	var monsterNameShort = monsterName.replace(/^an?\s/, '');
 	var infight = GetCharData("infight");
+
+	$monster.html('a <a href="http://kol.coldfront.net/thekolwiki/index.php/'+
+		'Special:Search?search='+ monsterNameShort.replace(/\s/g, '+').replace('"', '')+
+		'&go=Go" target="_blank">'+monsterNameShort+'</a>');
 
 	function setItem(sel, itemName) {
 		for (var i=1; i < sel.options.length; i++) {
@@ -2512,14 +2518,18 @@ function at_arcade() {
 
 // CHOICE: special functions for choice adventure text.
 function at_choice() {
+
+	InlineItemDescriptions();
+
 	var square = GetCharData("square");
 	SetCharData("square",false);
 	var $NCTitle = $('b:eq(0)');
 	var NCText = $NCTitle.text();
 
-	$NCTitle.wrap('<a style="color:white;" href="http://kol.coldfront.net/thekolwiki/index.php/'+
-	 'Special:Search?search='+ NCText.replace(/\s/g, '+').replace('"', '') +'&go=Go" '+
-	 'target="_blank"></a>');
+	if(NCText !== "Results:")
+		$NCTitle.wrap('<a style="color:white;" href="http://kol.coldfront.net/thekolwiki/index.php/'+
+			'Special:Search?search='+ NCText.replace(/\s/g, '+').replace('"', '') +'&go=Go" '+
+			'target="_blank"></a>');
 
 	if (square) {
 		if (square.indexOf("hiddencity") != -1) link_hiddencity(square);
@@ -2873,6 +2883,27 @@ function at_inventory() {
 			}
 		}
 	}
+
+	// Real-time filtration (not ready for prime-time)
+//	if(GetPref("inlineitemfilter"))
+	$("#filter input").on("keyup", function(e) {
+		var $input = $(this);
+		var filterVal = $input.val().toLowerCase();
+		if(!filterVal) { $(".item").show(); return true; }
+
+		if(!window.currentItems) {
+			window.currentItems = {};
+			$(".item").each(function() {
+				var $item = $(this);
+				window.currentItems[$item.find("b").text().toLowerCase()] = $item;
+			});
+		}
+
+		$.each(window.currentItems, function(k, $item) {
+			$item.toggle(k.indexOf(filterVal) !== -1);
+		});
+	});
+
 
 	// Equipment page only
 	if (gearpage == 1) {
