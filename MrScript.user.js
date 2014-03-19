@@ -2526,10 +2526,12 @@ function at_choice() {
 	var $NCTitle = $('b:eq(0)');
 	var NCText = $NCTitle.text();
 
-	if(NCText !== "Results:")
-		$NCTitle.wrap('<a style="color:white;" href="http://kol.coldfront.net/thekolwiki/index.php/'+
-			'Special:Search?search='+ NCText.replace(/\s/g, '+').replace('"', '') +'&go=Go" '+
-			'target="_blank"></a>');
+	if(NCText === "Results:")
+		$NCTitle = $("body > center > center > table b:first");
+
+	$NCTitle.wrap('<a style="color:white;" href="http://kol.coldfront.net/thekolwiki/index.php/'+
+		'Special:Search?search='+ $NCTitle.text().replace(/\s/g, '+').replace('"', '') +'&go=Go" '+
+		'target="_blank"></a>');
 
 	if (square) {
 		if (square.indexOf("hiddencity") != -1) link_hiddencity(square);
@@ -2793,7 +2795,14 @@ function at_bounty() {
 
 }
 
+function at_storage() {
+	InlineItemDescriptions();
+}
+
 function at_mall() {
+
+	InlineItemDescriptions();
+
 	$('center table tr td center table:first').prepend('<tr><td><center><a href=managestore.php>Manage your Store</a><br /><br /></center></td></tr>');
 }
 
@@ -2803,6 +2812,9 @@ function at_managestore() {
 
 // MALLSTORE: add fun links to (some of) the things you buy!
 function at_mallstore() {
+
+	InlineItemDescriptions();
+
 	var img = document.images[0];
 	if (img == undefined) return;
 	var onclick = img.getAttribute("onclick");
@@ -3158,6 +3170,9 @@ function at_galaktik() {
 
 // BIGISLAND: add inventory check, max buttons to Frat/Hippy Trade-In stores.
 function at_bigisland() {
+
+	InlineItemDescriptions();
+
 	$('img').each(function()
 	{	var onclick = this.getAttribute('onclick');
 		if (onclick != undefined && onclick.indexOf("desc") != -1)
